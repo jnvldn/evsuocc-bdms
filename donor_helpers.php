@@ -142,6 +142,56 @@ function donor_validate_registration_inputs(array $p): array
     return ['ok' => $errors === [], 'errors' => $errors];
 }
 
+/**
+ * @param array<string, mixed> $p
+ * @return array{ok: bool, errors: string[]}
+ */
+function donor_validate_donation_inputs(array $p): array
+{
+    $errors = [];
+
+    $donorId = $p['donor_id'] ?? '';
+    if ($donorId === '' || !is_numeric($donorId) || (int) $donorId <= 0) {
+        $errors[] = 'Donor is required.';
+    }
+
+    $blood = (string) ($p['blood_type'] ?? '');
+    $allowedBlood = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    if (!in_array($blood, $allowedBlood, true)) {
+        $errors[] = 'Blood type is invalid.';
+    }
+
+    $qty = $p['quantity_ml'] ?? '';
+    if ($qty === '' || !is_numeric($qty) || (int) $qty <= 0) {
+        $errors[] = 'Quantity must be a positive number.';
+    } elseif ((int) $qty > 600) {
+        $errors[] = 'Quantity seems unreasonably high; please verify.';
+    }
+
+    $dateRaw = trim((string) ($p['donation_date'] ?? ''));
+    if ($dateRaw === '') {
+        $errors[] = 'Donation date is required.';
+    } else {
+        $d = DateTimeImmutable::createFromFormat('Y-m-d', $dateRaw);
+        if ($d === false) {
+            $errors[] = 'Donation date is invalid.';
+        } else {
+            $today = new DateTimeImmutable('today');
+            if ($d > $today) {
+                $errors[] = 'Donation date cannot be in the future.';
+            }
+        }
+    }
+
+    $elig = (string) ($p['eligibility_status'] ?? '');
+    $allowedElig = ['Eligible', 'Temporarily Deferred', 'Not Eligible'];
+    if (!in_array($elig, $allowedElig, true)) {
+        $errors[] = 'Eligibility status is invalid.';
+    }
+
+    return ['ok' => $errors === [], 'errors' => $errors];
+}
+
 function donor_find_duplicate_id(mysqli $conn, string $email, string $contact, string $birthdateYmd): ?int
 {
     $emailNorm = donor_normalize_email($email);
