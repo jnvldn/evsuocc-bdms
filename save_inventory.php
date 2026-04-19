@@ -1,14 +1,6 @@
 <?php
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "bdms";
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-if ($conn->connect_error) {
-  die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . "/db.php";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
   $donor_id = $_POST["donor_id"];
