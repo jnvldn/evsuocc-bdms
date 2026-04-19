@@ -271,7 +271,7 @@ $conn->close();
     <ul>
       <li><a href="add.php"><i class="fas fa-user-plus"></i> Add Donor</a></li>
       <li><a href="donors_list.php"><i class="fas fa-users"></i> Donors Lists</a></li>
-      <li><a href="donor_reports.php"><i class="fas fa-file-alt"></i> Donor Reports</a></li>
+      <li><a href="reports.php"><i class="fas fa-file-alt"></i> Generate Report</a></li>
       <li><a href="blood_inventory.php"><i class="fas fa-tint"></i> Blood Inventory</a></li>
       <li><a href="record_donation.php"><i class="fas fa-hand-holding-medical"></i> Record Donation</a></li>
       <li><a href="audit_log.php"><i class="fas fa-clipboard-list"></i> Audit Log</a></li>
@@ -345,6 +345,21 @@ $conn->close();
       sidebar.classList.toggle("active");
       mainContent.classList.toggle("shifted");
     }
+
+    (function () {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('reports') === 'denied') {
+        Swal.fire({
+          icon: 'error',
+          title: 'Access denied',
+          text: 'That page is for administrators only.',
+          confirmButtonColor: '#8b0000'
+        });
+        if (window.history.replaceState) {
+          window.history.replaceState({}, '', 'dashboard.php');
+        }
+      }
+    })();
 
     function confirmLogout(event) {
       event.preventDefault();
