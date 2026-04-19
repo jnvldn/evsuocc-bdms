@@ -10,6 +10,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if ($username === $valid_username && $password === $valid_password) {
         $_SESSION["user"] = $username;
+        $_SESSION["role"] = "staff";
         header("Location: dashboard.php");
         exit();
     } else {
