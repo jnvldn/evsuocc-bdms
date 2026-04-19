@@ -1,48 +1,90 @@
 <?php
 ob_start();
-$servername = "localhost";
-$username = "root";
-$password = "";
-$dbname = "bdms";
-
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-  die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . "/db.php";
+require_once __DIR__ . "/donor_helpers.php";
 
 $showAlert = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  $name = $_POST["name"];
-  $birthdate = $_POST["birthdate"];
-  $address = $_POST["address"];
-  $blood_type = $_POST["blood_type"];
-  $civil_status = $_POST["civil_status"];
-  $donation_history = $_POST["donation_history"];
-  $classification = $_POST["classification"];
-  $contact_number = $_POST["contact_number"];
-  $gender = $_POST["gender"];
-  $blood_quantity = $_POST["blood_quantity"];
-  $collection_date = $_POST["collection_date"];
-  $email = $_POST["email"];
-  $donation_type = $_POST["donation_type"];
-  $donation_location = $_POST["donation_location"];
+$validationErrors = [];
+$DuplicateDonorId = null;
 
-  $birthdateObj = new DateTime($birthdate);
-  $current_date = new DateTime();
-  $age = $current_date->diff($birthdateObj)->y;
-
-  $sql = "INSERT INTO donors (name, birthdate, address, blood_type, civil_status, donation_history, classification, contact_number, gender, blood_quantity, collection_date, email, age, donation_type, donation_location)
-          VALUES ('$name', '".$birthdateObj->format('Y-m-d')."', '$address', '$blood_type', '$civil_status', '$donation_history', '$classification', '$contact_number', '$gender', '$blood_quantity', '$collection_date', '$email', '$age', '$donation_type', '$donation_location')";
-
-  if ($conn->query($sql) === TRUE) {
-    $showAlert = "success";
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+  $check = donor_validate_registration_inputs($_POST);
+  if (!$check["ok"]) {
+    $validationErrors = $check["errors"];
+    $showAlert = "validation";
   } else {
-    $showAlert = "error";
+    $name = trim((string) $_POST["name"]);
+    $birthdate = trim((string) $_POST["birthdate"]);
+    $address = trim((string) $_POST["address"]);
+    $blood_type = (string) $_POST["blood_type"];
+    $civil_status = (string) $_POST["civil_status"];
+    $donation_history = (string) $_POST["donation_history"];
+    $classification = (string) $_POST["classification"];
+    $contact_number = (string) $_POST["contact_number"];
+    $gender = (string) $_POST["gender"];
+    $blood_quantity = (int) $_POST["blood_quantity"];
+    $collection_date = trim((string) $_POST["collection_date"]);
+    $email = trim((string) $_POST["email"]);
+    $donation_type = (string) $_POST["donation_type"];
+    $donation_location = (string) $_POST["donation_location"];
+
+   $birthdateObj = DateTimeImmutable::createFromFormat("Y-m-d", $birthdate);
+    $birthYmd = $birthdateObj !== false ? $birthdateObj->format("Y-m-d") : $birthdate;
+    $current_date = new DateTimeImmutable();
+    $age = $birthdateObj !== false ? $current_date->diff($birthdateObj)->y : 0;
+
+
+  $dupId = donor_find_duplicate_id($conn, $email, $contact_number, $birthYmd);
+    if ($dupId !== null) {
+      $showAlert = "duplicate";
+      $duplicateDonorId = $dupId;
+    } else {
+      $donation_status = "Active";
+      $sql = "INSERT INTO donors (
+        name, birthdate, address, blood_type, civil_status, donation_history,
+        classification, contact_number, gender, blood_quantity, collection_date,
+        email, age, donation_type, donation_location, donation_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+  $stmt = $conn->prepare($sql);
+      if ($stmt === false) {
+        $showAlert = "error";
+      } else {
+        $stmt->bind_param(
+          "sssssssssississs",
+          $name,
+          $birthYmd,
+          $address,
+          $blood_type,
+          $civil_status,
+          $donation_history,
+          $classification,
+          $contact_number,
+          $gender,
+          $blood_quantity,
+          $collection_date,
+          $email,
+          $age,
+          $donation_type,
+          $donation_location,
+          $donation_status
+        );
+        if ($stmt->execute()) {
+          $showAlert = "success";
+        } else {
+          $showAlert = "error";
+        }
+        $stmt->close();
+      }
+    }
   }
 }
+
 $conn->close();
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -319,7 +361,7 @@ $conn->close();
 
   </form>
 
-  <?php if ($showAlert == "success"): ?>
+  <?php if ($showAlert === "success"): ?>
     <script>
       Swal.fire({
         title: 'Success!',
@@ -331,7 +373,36 @@ $conn->close();
         confirmButtonText: 'OK'
       });
     </script>
-  <?php elseif ($showAlert == "error"): ?>
+  <?php elseif ($showAlert === "duplicate" && $duplicateDonorId !== null): ?>
+    <script>
+      Swal.fire({
+        title: 'Duplicate donor',
+        html: <?php echo json_encode(
+          'A donor with this email or the same contact number and birth date is already registered (Donor ID: ' . $duplicateDonorId . ').',
+          JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        ); ?>,
+        icon: 'warning',
+        confirmButtonColor: '#b30000',
+        background: '#ffeaea',
+        color: '#8b0000',
+        confirmButtonText: 'OK'
+      });
+    </script>
+  <?php elseif ($showAlert === "validation" && $validationErrors !== []): ?>
+    <script>
+      Swal.fire({
+        title: 'Please check the form',
+        html: <?php echo json_encode('<ul style="text-align:left;margin:0;padding-left:1.2em;">' . implode('', array_map(static function (string $e): string {
+          return '<li>' . htmlspecialchars($e, ENT_QUOTES, 'UTF-8') . '</li>';
+        }, $validationErrors)) . '</ul>', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
+        icon: 'info',
+        confirmButtonColor: '#b30000',
+        background: '#ffeaea',
+        color: '#8b0000',
+        confirmButtonText: 'OK'
+      });
+    </script>
+  <?php elseif ($showAlert === "error"): ?>
     <script>
       Swal.fire({
         title: 'Error!',

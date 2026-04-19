@@ -70,7 +70,7 @@ if (isset($_SESSION['user'])) {
     }
 
     .error-msg {
-        color: white;
+        color: black;
         background-color: #ffe0e0;
         border-left: 5px solid #b00020;
         padding: 0.5rem;
