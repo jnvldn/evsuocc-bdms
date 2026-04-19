@@ -1,18 +1,10 @@
 <?php
-require_once __DIR__ . "/require_login.php";
-require_once __DIR__ . "/db.php";
+declare(strict_types=1);
 
-if (isset($_GET['id'])) {
-    $id = $_GET['id'];
+$bdmsHost = getenv('BDMS_DB_HOST') ?: '127.0.0.1';
+$bdmsUser = getenv('BDMS_DB_USER') ?: 'root';
+$bdmsPass = getenv('BDMS_DB_PASS') !== false ? getenv('BDMS_DB_PASS') : '';
+$bdmsName = getenv('BDMS_DB_NAME') ?: 'bdms';
 
-    $sql = "DELETE FROM donors WHERE id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $id);
-
-    if ($stmt->execute()) {
-        echo "Success";
-    } else {
-        echo "Error ";
-    }
-}
-?>
+$conn = new mysqli($bdmsHost, $bdmsUser, $bdmsPass, $bdmsName);
+$conn->set_charset('utf8mb4');

@@ -4,9 +4,9 @@ require_once __DIR__ . "/require_login.php";
 require_once __DIR__ . "/db.php";
 
 if (isset($_GET['id'])) {
-    $donor_id = $_GET['id'];
+    $donor_id = (int) $_GET['id'];
 
-    $sql = "SELECT * FROM donors WHERE id = $donor_id";
+    $sql = "SELECT * FROM donors WHERE id = " . $donor_id;
     $result = $conn->query($sql);
 
     if ($result->num_rows > 0) {
@@ -14,6 +14,24 @@ if (isset($_GET['id'])) {
     } else {
         echo "No donor found with this ID.";
         exit;
+    }
+
+    $donationHistoryRows = [];
+    $histTable = $conn->query("SHOW TABLES LIKE 'donations'");
+    if ($histTable && $histTable->num_rows > 0) {
+        $hStmt = $conn->prepare(
+            'SELECT donation_date, blood_type, quantity_ml, eligibility_status, created_at
+             FROM donations WHERE donor_id = ? ORDER BY donation_date DESC, id DESC'
+        );
+        if ($hStmt) {
+            $hStmt->bind_param('i', $donor_id);
+            $hStmt->execute();
+            $hRes = $hStmt->get_result();
+            while ($r = $hRes->fetch_assoc()) {
+                $donationHistoryRows[] = $r;
+            }
+            $hStmt->close();
+        }
     }
 } else {
     echo "No donor ID provided.";
@@ -31,6 +49,7 @@ ob_end_flush();
     <title>View Donor</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             font-family: 'Montserrat', sans-serif;
@@ -97,6 +116,46 @@ ob_end_flush();
             margin-right: 8px;
         }
 
+        .history-section {
+            margin: 32px auto 120px;
+            max-width: 900px;
+        }
+
+        .history-section h3 {
+            color: #b30000;
+            font-size: 18px;
+            margin-bottom: 12px;
+            text-align: left;
+            text-transform: none;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .history-table th {
+            background: #fff5f5;
+            color: #b30000;
+            padding: 10px;
+            text-align: left;
+            font-size: 13px;
+            border: 1px solid #eee;
+        }
+
+        .history-table td {
+            padding: 10px;
+            border: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        .history-table td:first-child,
+        .history-table th:first-child {
+            border-left: 1px solid #eee;
+        }
+
         .button-wrapper {
             position: fixed;
             bottom: 0;
@@ -112,7 +171,8 @@ ob_end_flush();
         }
 
         .button-wrapper button {
-            width: 200px;
+            min-width: 200px;
+            max-width: 280px;
             padding: 12px 25px;
             background: linear-gradient(135deg, #b30000, #800000);
             color: #fff;
@@ -233,9 +293,54 @@ ob_end_flush();
         </tr>
     </table>
 
+    <?php if (!empty($donationHistoryRows)): ?>
+    <div class="history-section">
+        <h3><i class="fas fa-history"></i> Donation history</h3>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Blood type</th>
+                    <th>Quantity (ml)</th>
+                    <th>Eligibility</th>
+                    <th>Recorded</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($donationHistoryRows as $h): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($h['donation_date']); ?></td>
+                    <td><?php echo htmlspecialchars($h['blood_type']); ?></td>
+                    <td><?php echo (int) $h['quantity_ml']; ?></td>
+                    <td><?php echo htmlspecialchars($h['eligibility_status']); ?></td>
+                    <td><?php echo htmlspecialchars($h['created_at']); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
     <div class="button-wrapper">
         <button onclick="window.location.href='donors_list.php';"><i class="fas fa-list"></i>Donors List</button>
+        <button onclick="window.location.href='record_donation.php?donor_id=<?php echo (int) $donor_id; ?>';"><i class="fas fa-tint"></i> Record another donation</button>
     </div>
+
+    <?php if (isset($_GET['recorded'])): ?>
+    <script>
+    Swal.fire({
+        icon: 'success',
+        title: 'Donation recorded',
+        text: 'Inventory and donor profile have been updated.',
+        confirmButtonColor: '#b30000'
+    });
+    if (window.history.replaceState) {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('recorded');
+        window.history.replaceState({}, '', u.pathname + u.search);
+    }
+    </script>
+    <?php endif; ?>
 
 </body>
 </html>

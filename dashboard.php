@@ -273,6 +273,8 @@ $conn->close();
       <li><a href="donors_list.php"><i class="fas fa-users"></i> Donors Lists</a></li>
       <li><a href="donor_reports.php"><i class="fas fa-file-alt"></i> Donor Reports</a></li>
       <li><a href="blood_inventory.php"><i class="fas fa-tint"></i> Blood Inventory</a></li>
+      <li><a href="record_donation.php"><i class="fas fa-hand-holding-medical"></i> Record Donation</a></li>
+      <li><a href="audit_log.php"><i class="fas fa-clipboard-list"></i> Audit Log</a></li>
     </ul>
   </div>
 

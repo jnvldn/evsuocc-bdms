@@ -206,6 +206,7 @@ $result = $conn->query($sql);
             <td><?php echo $row['email']; ?></td>
             <td>
               <a href="view_donor.php?id=<?php echo $row['id']; ?>"><i class="fas fa-eye"></i> View</a> | 
+              <a href="record_donation.php?donor_id=<?php echo $row['id']; ?>"><i class="fas fa-tint"></i> Donate</a> | 
               <a href="edit_donor.php?id=<?php echo $row['id']; ?>"><i class="fas fa-edit"></i> Edit</a> | 
               <a href="javascript:void(0);" onclick="deleteDonor(<?php echo $row['id']; ?>)"><i class="fas fa-trash-alt"></i> Delete</a>
             </td>
