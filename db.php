@@ -1,15 +1,18 @@
 <?php
-declare(strict_types=1);
+require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . "/db.php";
 
-$DB_HOST = "localhost";
-$DB_USER = "root";
-$DB_PASS = "";
-$DB_NAME = "bdms";
+if (isset($_GET['id'])) {
+    $id = $_GET['id'];
 
-$conn = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+    $sql = "DELETE FROM donors WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $id);
+
+    if ($stmt->execute()) {
+        echo "Success";
+    } else {
+        echo "Error ";
+    }
 }
-
-$conn->set_charset("utf8mb4");
-
+?>
