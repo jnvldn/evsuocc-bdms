@@ -1,9 +1,6 @@
 <?php  
-$conn = new mysqli("localhost", "root", "", "bdms");
-
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . "/db.php";
 
 $selected_month = isset($_POST['month']) ? $_POST['month'] : 'all';
 
