@@ -244,6 +244,10 @@ $result = $conn->query($sql);
 </head>
 <body>
 
+<p style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:14px;">
+  <strong>New:</strong> Use <a href="reports.php" style="color:#b30000;font-weight:600;">Generate Report</a> for donor and inventory reports with date range, filters, and CSV/PDF export.
+</p>
+
 <div class="header-container">
     <h2><i class="fas fa-tint"></i> Donor Report</h2>
     <div id="datetime"></div>

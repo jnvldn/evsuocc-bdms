@@ -10,7 +10,9 @@ if (!isset($_SESSION["user"])) {
     exit();
 }
 
-if (!isset($_SESSION["role"])) {
+if (isset($_SESSION["user"]) && $_SESSION["user"] === "admin") {
+    $_SESSION["role"] = "administrator";
+} elseif (!isset($_SESSION["role"])) {
     $_SESSION["role"] = "staff";
 }
 
