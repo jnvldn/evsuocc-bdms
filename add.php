@@ -1,13 +1,18 @@
 <?php
+/**
+ * Register donors (staff may add; only administrators may delete donor records).
+ */
 ob_start();
-require_once __DIR__ . "/require_login.php";
-require_once __DIR__ . "/db.php";
+require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/bdms_profile_bar.php';
+require_once __DIR__ . '/bdms_audit_log_helpers.php';
 require_once __DIR__ . "/donor_helpers.php";
 
 $showAlert = "";
 
 $validationErrors = [];
-$DuplicateDonorId = null;
+$duplicateDonorId = null;
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
   $check = donor_validate_registration_inputs($_POST);
@@ -72,6 +77,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
           $donation_status
         );
         if ($stmt->execute()) {
+          $newDonorId = (int) $conn->insert_id;
+          bdms_audit_log_insert($conn, 'add_donor', 'New donor', $newDonorId, [
+            'donor_id' => $newDonorId,
+            'name' => $name,
+            'blood_type' => $blood_type,
+            'email' => $email,
+            'classification' => $classification,
+          ]);
           $showAlert = "success";
         } else {
           $showAlert = "error";
@@ -90,7 +103,9 @@ $conn->close();
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Add Donor</title>
+  <?php bdms_profile_bar_print_styles(); ?>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
@@ -102,32 +117,118 @@ $conn->close();
     }
 
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Montserrat', Arial, sans-serif;
       background: #ffeaea;
-      padding: 60px;
       font-size: 14px;
-      overflow: hidden;
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding-top: 0;
     }
 
-    h2 {
-      text-align: center;
-      color: #8b0000;
-      margin-bottom: 30px;
-      margin-top: -20px;
-      font-size: 28px;
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 500;
-      text-transform: uppercase;
-    }
-
-    h2 i {
-      margin-right: 10px;
-    }
-
-    form {
+    /* Top navbar: title + profile + all actions */
+    .add-navbar {
+      position: sticky;
+      top: 0;
+      z-index: 2000;
       display: flex;
       flex-wrap: wrap;
-      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 16px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, #8b0000, #b30000);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .add-navbar-left {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px 20px;
+      min-width: 0;
+      flex: 1 1 200px;
+    }
+
+    .add-navbar-title {
+      color: #fff;
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    .add-navbar-title i {
+      margin-right: 8px;
+    }
+
+    .add-navbar .bdms-profile-bar--light {
+      max-width: 260px;
+      flex-shrink: 0;
+    }
+
+    .add-nav-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex: 1 1 180px;
+    }
+
+    .add-nav-actions button,
+    .add-nav-actions a.nav-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: filter 0.2s, transform 0.15s;
+      font-family: inherit;
+    }
+
+    .add-nav-actions button:hover,
+    .add-nav-actions a.nav-btn:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .nav-btn-primary {
+      background: #fff;
+      color: #b30000;
+    }
+
+    .nav-btn-secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.45) !important;
+    }
+
+    .nav-btn-outline {
+      background: transparent;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    }
+
+    .add-main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 16px 32px;
+    }
+
+    form#form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
     .form-group,
@@ -138,11 +239,13 @@ $conn->close();
     }
 
     .form-group {
-      flex: 1 1 calc(33.333% - 20px);
+      flex: 1 1 calc(33.333% - 16px);
+      min-width: 180px;
     }
 
     .form-group-half {
-      flex: 1 1 calc(50% - 20px);
+      flex: 1 1 calc(50% - 16px);
+      min-width: 220px;
     }
 
     .form-group-full {
@@ -153,93 +256,69 @@ $conn->close();
       font-weight: bold;
       margin-bottom: 5px;
       font-size: 13px;
+      color: #4d0000;
     }
 
     input,
     select {
-      padding: 10px;
+      padding: 10px 12px;
       border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-
-    .button-wrapper {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      padding: 15px 0;
-      background-color: #fff;
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-      z-index: 1000;
-    }
-
-    .button-wrapper button {
-      width: 200px;
-      padding: 12px 25px;
-      background: linear-gradient(135deg, #b30000, #800000);
-      color: #fff;
-      border: none;
-      border-radius: 30px;
+      border-radius: 6px;
       font-size: 14px;
-      cursor: pointer;
-      font-weight: 500;
-      box-shadow: 0 4px 10px rgba(179, 0, 0, 0.3);
-      transition: all 0.4s ease;
-      position: relative;
-      overflow: hidden;
-      z-index: 1;
-    }
-
-    .button-wrapper button::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: -75%;
       width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.15);
-      transform: skewX(-45deg);
-      transition: left 0.5s ease;
-      z-index: 0;
+      max-width: 100%;
     }
 
-    .button-wrapper button:hover::before {
-      left: 125%;
+    @media (max-width: 900px) {
+      .form-group,
+      .form-group-half {
+        flex: 1 1 calc(50% - 12px);
+      }
     }
 
-    .button-wrapper button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 20px rgba(179, 0, 0, 0.6);
-    }
-
-    .button-wrapper button i {
-      margin-right: 8px;
-    }
-
-    @media (max-width: 768px) {
-      body {
-        padding: 20px;
+    @media (max-width: 600px) {
+      .form-group,
+      .form-group-half,
+      .form-group-full {
+        flex: 1 1 100%;
+        min-width: 100%;
       }
 
-      table {
-        font-size: 12px;
+      .add-navbar {
+        padding: 10px 12px;
       }
 
-      .button-wrapper {
-        flex-direction: column;
-        gap: 10px;
+      .add-nav-actions {
+        justify-content: flex-start;
+        width: 100%;
+      }
+
+      .add-nav-actions button,
+      .add-nav-actions a.nav-btn {
+        flex: 1 1 auto;
+        min-width: calc(50% - 6px);
+        white-space: normal;
+        text-align: center;
       }
     }
   </style>
 </head>
 <body>
 
-  <h2><i class="fas fa-user-plus"></i>Add New Donor</h2>
+  <header class="add-navbar" role="banner">
+    <div class="add-navbar-left">
+      <div class="add-navbar-title"><i class="fas fa-user-plus"></i> Add New Donor</div>
+      <?php bdms_profile_bar_render(true); ?>
+    </div>
+    <nav class="add-nav-actions" aria-label="Form actions">
+      <button type="submit" form="form" class="nav-btn-primary"><i class="fas fa-plus"></i> Add Donor</button>
+      <button type="button" class="nav-btn-secondary" onclick="clearForm();"><i class="fas fa-eraser"></i> Clear</button>
+      <a class="nav-btn nav-btn-outline" href="dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+      <a class="nav-btn nav-btn-outline" href="donors_list.php"><i class="fas fa-list"></i> Donors List</a>
+    </nav>
+  </header>
 
+  <main class="add-main">
   <form id="form" method="POST" action="">
 
     <div class="form-group">
@@ -352,14 +431,8 @@ $conn->close();
       </select>
     </div>
 
-    <div class="button-wrapper">
-      <button type="submit"><i class="fas fa-plus"></i> Add Donor</button>
-      <button type="button" onclick="clearForm();"><i class="fas fa-trash-alt"></i> Clear All</button>
-      <button type="button" onclick="window.location.href='dashboard.php';"><i class="fas fa-tachometer-alt"></i> Dashboard</button>
-      <button type="button" onclick="window.location.href='donors_list.php';"><i class="fas fa-list"></i> Donors List</button>
-    </div>
-
   </form>
+  </main>
 
   <?php if ($showAlert === "success"): ?>
     <script>
