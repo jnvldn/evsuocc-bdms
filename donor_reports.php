@@ -1,5 +1,6 @@
 <?php  
 require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . '/require_login.php';
 require_once __DIR__ . "/db.php";
 
 $selected_month = isset($_POST['month']) ? $_POST['month'] : 'all';
