@@ -1,6 +1,7 @@
 <?php
 ob_start();
-require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/bdms_audit_log_helpers.php';
 require_once __DIR__ . "/db.php";
 
 $showAlert = "";
@@ -58,6 +59,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     WHERE id = '$id'";
 
   if ($conn->query($update_sql) === TRUE) {
+    $donorIdInt = (int) $id;
+    bdms_audit_log_insert($conn, 'update_donor', 'donor', $donorIdInt, [
+      'donor_id' => $donorIdInt,
+      'name' => $name,
+      'blood_type' => $blood_type,
+      'email' => $email,
+      'classification' => $classification,
+    ]);
     $showAlert = "success";
     $row = $_POST;
   } else {
