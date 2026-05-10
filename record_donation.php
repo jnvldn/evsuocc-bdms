@@ -6,11 +6,97 @@ require_once __DIR__ . '/require_login.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/donor_helpers.php';
 
+// Make MySQLi throw exceptions on errors so we can surface the real cause.
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
 $showAlert = '';
 $validationErrors = [];
+$lastDbError = '';
 
-$tableCheck = $conn->query("SHOW TABLES LIKE 'donations'");
-$schemaOk = $tableCheck && $tableCheck->num_rows > 0;
+// Pre-flight schema checks so we can show a precise fix message.
+$schemaIssues = [];
+
+$hasColumns = static function (mysqli $conn, string $table, array $columns): array {
+    $missing = [];
+    $in = "'" . implode("','", array_map(static fn ($c) => $conn->real_escape_string((string) $c), $columns)) . "'";
+    $sql = "
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = '" . $conn->real_escape_string($table) . "'
+          AND COLUMN_NAME IN ($in)
+    ";
+    $res = $conn->query($sql);
+    $found = [];
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            $found[(string) $row['COLUMN_NAME']] = true;
+        }
+    }
+    foreach ($columns as $c) {
+        if (!isset($found[$c])) {
+            $missing[] = $c;
+        }
+    }
+    return $missing;
+};
+
+$donationsCheck = $conn->query("SHOW TABLES LIKE 'donations'");
+if (!($donationsCheck && $donationsCheck->num_rows > 0)) {
+    $schemaIssues[] = 'Missing table: donations (run schema_us02.sql)';
+}
+
+$auditCheck = $conn->query("SHOW TABLES LIKE 'audit_log'");
+if (!($auditCheck && $auditCheck->num_rows > 0)) {
+    $schemaIssues[] = 'Missing table: audit_log (run schema_us02.sql)';
+}
+
+// Columns required by this page.
+$missingDonorsCols = $hasColumns($conn, 'donors', [
+    'id',
+    'blood_type',
+    'blood_quantity',
+    'collection_date',
+    'donation_date',
+    'donation_status',
+    'donation_history',
+    'donation_dates',
+    'number_of_donations',
+    'medical_eligibility',
+]);
+if ($missingDonorsCols) {
+    $schemaIssues[] = 'Missing columns in donors: ' . implode(', ', $missingDonorsCols) . ' (import/apply latest bdms.sql)';
+}
+
+$missingInvCols = $hasColumns($conn, 'blood_inventory', [
+    'id',
+    'blood_type',
+    'quantity',
+    'status',
+    'donated_by',
+]);
+if ($missingInvCols) {
+    $schemaIssues[] = 'Missing columns in blood_inventory: ' . implode(', ', $missingInvCols) . ' (import/apply latest bdms.sql)';
+}
+
+// `blood_inventory.id` must be AUTO_INCREMENT because inserts omit `id`.
+$invIdOk = false;
+$invIdRes = $conn->query("
+    SELECT EXTRA
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'blood_inventory'
+      AND COLUMN_NAME = 'id'
+    LIMIT 1
+");
+if ($invIdRes && ($r = $invIdRes->fetch_assoc())) {
+    $invIdOk = stripos((string)$r['EXTRA'], 'auto_increment') !== false;
+}
+if (!$invIdOk) {
+    $schemaIssues[] = 'Column blood_inventory.id is not AUTO_INCREMENT (import/apply bdms.sql ALTER TABLE for blood_inventory)';
+}
+
+$schemaOk = empty($schemaIssues);
 
 $donorsList = $conn->query(
     'SELECT id, name, blood_type, contact_number, email FROM donors ORDER BY name ASC'
@@ -42,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $sel = $conn->prepare('SELECT id, donation_history, donation_dates, number_of_donations FROM donors WHERE id = ? FOR UPDATE');
             if ($sel === false) {
+                $lastDbError = $conn->error;
                 $showAlert = 'error';
             } else {
                 $sel->bind_param('i', $donorId);
@@ -193,6 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 } catch (Throwable $e) {
                     $conn->rollback();
+                    $lastDbError = $e->getMessage();
                     $showAlert = 'error';
                 }
             }
@@ -410,7 +498,8 @@ ob_end_flush();
       <div class="form-group">
         <label for="donation_date">Donation date</label>
         <input type="date" name="donation_date" id="donation_date" required
-          value="<?php echo htmlspecialchars(date('Y-m-d')); ?>">
+          value="<?php echo htmlspecialchars(bdms_today_ymd(), ENT_QUOTES, 'UTF-8'); ?>"
+          max="<?php echo htmlspecialchars(bdms_today_ymd(), ENT_QUOTES, 'UTF-8'); ?>">
       </div>
 
       <div class="form-group">
@@ -470,7 +559,11 @@ ob_end_flush();
     hidden.value = id;
     const meta = donorsMeta.find(function (d) { return d.id === id; });
     if (meta && bloodSel) {
-      bloodSel.value = meta.blood_type;
+      const bt = String(meta.blood_type || '').trim();
+      bloodSel.value = bt;
+      if (bt && !Array.from(bloodSel.options).some(function (o) { return o.value === bt; })) {
+        bloodSel.value = '';
+      }
     }
     label.innerHTML = 'Selected: <strong>' + name.replace(/</g, '&lt;') + '</strong> (ID ' + id + ')';
     document.querySelectorAll('#donorTableBody tr').forEach(function (tr) {
@@ -501,7 +594,12 @@ ob_end_flush();
     }
   }
 
+  let allowSubmit = false;
   document.getElementById('donationForm').addEventListener('submit', function (e) {
+    if (allowSubmit) {
+      return;
+    }
+
     if (!hidden.value) {
       e.preventDefault();
       Swal.fire({
@@ -510,7 +608,37 @@ ob_end_flush();
         text: 'Please choose a donor from the list.',
         confirmButtonColor: '#b30000'
       });
+      return;
     }
+
+    e.preventDefault();
+    const form = this;
+
+    if (typeof Swal === 'undefined') {
+      const shouldSubmit = window.confirm('Are you sure you want to save this donation?');
+      if (shouldSubmit) {
+        allowSubmit = true;
+        form.submit();
+      }
+      return;
+    }
+
+    Swal.fire({
+      icon: 'question',
+      title: 'Save donation record?',
+      text: 'Please confirm before adding this donation data.',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, save',
+      cancelButtonText: 'No, cancel',
+      confirmButtonColor: '#b30000',
+      cancelButtonColor: '#6c757d',
+      reverseButtons: true
+    }).then(function (result) {
+      if (result.isConfirmed) {
+        allowSubmit = true;
+        form.submit();
+      }
+    });
   });
 })();
 
@@ -523,11 +651,25 @@ Swal.fire({
   }, $validationErrors)) . '</ul>'); ?>,
   confirmButtonColor: '#b30000'
 });
+<?php elseif ($showAlert === 'schema'): ?>
+Swal.fire({
+  icon: 'warning',
+  title: 'Database update required',
+  html: <?php echo json_encode('<ul style="text-align:left">' . implode('', array_map(static function ($e) {
+      return '<li>' . htmlspecialchars($e, ENT_QUOTES, 'UTF-8') . '</li>';
+  }, $schemaIssues)) . '</ul>'); ?>,
+  confirmButtonColor: '#b30000'
+});
 <?php elseif ($showAlert === 'error'): ?>
 Swal.fire({
   icon: 'error',
   title: 'Could not save',
-  text: 'Please try again. If the problem continues, ensure schema_us02.sql has been applied.',
+  html: <?php echo json_encode(
+      'Please try again.<br><br><strong>Details:</strong><br><code style="white-space:pre-wrap">' .
+      htmlspecialchars($lastDbError ?: 'Unknown database error', ENT_QUOTES, 'UTF-8') .
+      '</code>',
+      JSON_UNESCAPED_UNICODE
+  ); ?>,
   confirmButtonColor: '#b30000'
 });
 <?php endif; ?>

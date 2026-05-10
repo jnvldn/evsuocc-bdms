@@ -73,6 +73,20 @@ CREATE TABLE `donors` (
   `donation_frequency` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `blood_thresholds`
+-- (US-04: predefined low-inventory thresholds)
+--
+
+CREATE TABLE `blood_thresholds` (
+  `blood_type` varchar(10) NOT NULL,
+  `threshold_ml` int(11) NOT NULL DEFAULT 500,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`blood_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 --
 -- Dumping data for table `donors`
 --
@@ -88,6 +102,20 @@ INSERT INTO `donors` (`id`, `name`, `birthdate`, `address`, `blood_type`, `civil
 (14, 'CPJ Garcia', '2001-06-05', 'Bohol', 'A+', 'Single', 'First Time', 'Student', '09746354256', 'Male', 143, '2025-04-25', 'cpjgarcia01@gmail.com', 'In House', 'Red Cross Area', 23, NULL, NULL, 450, 450, 'Active', '2025-05-03 00:39:38', '09746354256 | cpjgarcia01@gmail.com', NULL, NULL, 0, NULL, NULL, NULL),
 (15, 'Jose Garcia', '2000-02-01', 'Bohol', 'AB+', 'Single', 'First Time', 'Student', '09746354256', 'Female', 143, '2020-02-01', 'cpjgarcia01@gmail.com', 'Walk-In/Voluntary', 'Red Cross Area', 25, NULL, NULL, 450, 450, 'Expired', '2025-05-03 00:39:38', '09746354256 | cpjgarcia01@gmail.com', NULL, NULL, 0, NULL, NULL, NULL),
 (16, 'Maria Garcia', '1976-02-09', 'Bohol', 'A-', 'Single', 'Regular Donor', 'Student', '09786543654', 'Female', 799, '2020-07-09', 'mariagarcia90@gmail.com', 'Walk-In/Voluntary', 'Red Cross Area', 49, NULL, NULL, 450, 450, 'Expired', '2025-05-03 00:39:38', '09786543654 | mariagarcia90@gmail.com', NULL, NULL, 0, NULL, NULL, NULL);
+
+--
+-- Dumping data for table `blood_thresholds`
+--
+
+INSERT INTO `blood_thresholds` (`blood_type`, `threshold_ml`) VALUES
+('A+', 500),
+('A-', 500),
+('B+', 500),
+('B-', 500),
+('AB+', 500),
+('AB-', 500),
+('O+', 500),
+('O-', 500);
 
 --
 -- Indexes for dumped tables
