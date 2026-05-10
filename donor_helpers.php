@@ -1,6 +1,23 @@
 <?php
 declare(strict_types=1);
 
+/** Application timezone for donation dates and “today” checks (override with env BDMS_TZ). */
+function bdms_app_timezone(): DateTimeZone
+{
+    static $tz = null;
+    if ($tz === null) {
+        $name = getenv('BDMS_TZ');
+        $tz = new DateTimeZone(is_string($name) && $name !== '' ? $name : 'Asia/Manila');
+    }
+
+    return $tz;
+}
+
+function bdms_today_ymd(): string
+{
+    return (new DateTimeImmutable('now', bdms_app_timezone()))->format('Y-m-d');
+}
+
 function donor_normalize_email(string $email): string
 {
     return strtolower(trim($email));
@@ -155,7 +172,7 @@ function donor_validate_donation_inputs(array $p): array
         $errors[] = 'Donor is required.';
     }
 
-    $blood = (string) ($p['blood_type'] ?? '');
+    $blood = trim((string) ($p['blood_type'] ?? ''));
     $allowedBlood = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
     if (!in_array($blood, $allowedBlood, true)) {
         $errors[] = 'Blood type is invalid.';
@@ -172,11 +189,13 @@ function donor_validate_donation_inputs(array $p): array
     if ($dateRaw === '') {
         $errors[] = 'Donation date is required.';
     } else {
-        $d = DateTimeImmutable::createFromFormat('Y-m-d', $dateRaw);
+        $tz = bdms_app_timezone();
+        $d = DateTimeImmutable::createFromFormat('Y-m-d', $dateRaw, $tz);
         if ($d === false) {
             $errors[] = 'Donation date is invalid.';
         } else {
-            $today = new DateTimeImmutable('today');
+            $d = $d->setTime(0, 0, 0);
+            $today = (new DateTimeImmutable('now', $tz))->setTime(0, 0, 0);
             if ($d > $today) {
                 $errors[] = 'Donation date cannot be in the future.';
             }
