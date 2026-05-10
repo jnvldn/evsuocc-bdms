@@ -1,7 +1,10 @@
 <?php
 ob_start();
-require_once __DIR__ . "/require_login.php";
-require_once __DIR__ . "/db.php";
+require_once __DIR__ . '/require_login.php';
+require_once __DIR__ . '/bdms_profile_bar.php';
+require_once __DIR__ . '/db.php';
+
+$can_delete_donor = bdms_is_administrator();
 
 $sql = "SELECT * FROM donors";
 $result = $conn->query($sql);
@@ -207,8 +210,8 @@ $result = $conn->query($sql);
             <td>
               <a href="view_donor.php?id=<?php echo $row['id']; ?>"><i class="fas fa-eye"></i> View</a> | 
               <a href="record_donation.php?donor_id=<?php echo $row['id']; ?>"><i class="fas fa-tint"></i> Donate</a> | 
-              <a href="edit_donor.php?id=<?php echo $row['id']; ?>"><i class="fas fa-edit"></i> Edit</a> | 
-              <a href="javascript:void(0);" onclick="deleteDonor(<?php echo $row['id']; ?>)"><i class="fas fa-trash-alt"></i> Delete</a>
+              <a href="edit_donor.php?id=<?php echo $row['id']; ?>"><i class="fas fa-edit"></i> Edit</a><?php if ($can_delete_donor): ?> | 
+              <a href="javascript:void(0);" onclick="deleteDonor(<?php echo (int) $row['id']; ?>)"><i class="fas fa-trash-alt"></i> Delete</a><?php endif; ?>
             </td>
           </tr>
         <?php endwhile; ?>
@@ -276,19 +279,32 @@ function deleteDonor(id) {
   }).then((result) => {
     if (result.isConfirmed) {
       fetch(`delete_donor.php?id=${id}`)
-        .then(response => response.text())
-        .then(data => {
-          Swal.fire({
-            icon: 'success',
-            title: 'Deleted!',
-            text: 'The donor has been deleted.',
-            confirmButtonColor: '#b30000',
-            confirmButtonText: '<i class="fas fa-check-circle"></i> OK'
-          }).then(() => {
-            document.getElementById(`donor-${id}`).remove();
-          });
+        .then(response => response.text().then(function (text) {
+          return { ok: response.ok, status: response.status, text: text };
+        }))
+        .then(function (res) {
+          if (res.ok && res.text.trim() === 'Success') {
+            Swal.fire({
+              icon: 'success',
+              title: 'Deleted!',
+              text: 'The donor has been deleted.',
+              confirmButtonColor: '#b30000',
+              confirmButtonText: '<i class="fas fa-check-circle"></i> OK'
+            }).then(function () {
+              var row = document.getElementById('donor-' + id);
+              if (row) row.remove();
+            });
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: res.status === 403 ? 'Not allowed' : 'Oops...',
+              text: res.status === 403 ? 'Only administrators can delete donor records.' : 'Something went wrong while deleting the donor.',
+              confirmButtonColor: '#b30000',
+              confirmButtonText: '<i class="fas fa-check-circle"></i> OK'
+            });
+          }
         })
-        .catch(error => {
+        .catch(function () {
           Swal.fire({
             icon: 'error',
             title: 'Oops...',
