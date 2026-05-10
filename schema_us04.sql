@@ -19,4 +19,3 @@ INSERT INTO `blood_thresholds` (`blood_type`, `threshold_ml`) VALUES
 ('O-', 500)
 ON DUPLICATE KEY UPDATE threshold_ml = VALUES(threshold_ml);
 
-
