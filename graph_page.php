@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . "/require_login.php";
+require_once __DIR__ . '/require_login.php';
 require_once __DIR__ . "/db.php";
 
 $sql = "SELECT blood_type, 
