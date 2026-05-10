@@ -1,9 +1,11 @@
 <?php
 session_start();
-$title = "Admin Login";
+$title = 'BDMS Sign in';
 
 if (isset($_SESSION['user'])) {
-    header("Location: dashboard.php");
+    $to_audit = (isset($_SESSION['role']) && $_SESSION['role'] === 'superadmin')
+        || (string) ($_SESSION['user'] ?? '') === 'superadmin';
+    header($to_audit ? 'Location: audit_log.php' : 'Location: dashboard.php');
     exit();
 }
 ?>
@@ -64,9 +66,28 @@ if (isset($_SESSION['user'])) {
         border-radius: 15px;
         background: #d33939;
         border: 1px solid #ffcccc;
-        box-shadow: none;
         box-sizing: border-box;
         overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        outline: 3px solid rgba(255, 215, 0, 0.55);
+        outline-offset: 5px;
+    }
+
+    .login-role-hint {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.92);
+        text-align: center;
+        line-height: 1.45;
+        max-width: 320px;
+        margin: 0;
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.12);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .login-role-hint strong {
+        color: #fff;
     }
 
     .error-msg {
@@ -143,7 +164,8 @@ if (isset($_SESSION['user'])) {
                     <h2 style="margin: 0; margin-bottom: 10px;">EVSU-OCC BDMS</h2>
                 </div>
 
-                <div class="form_details" style="margin-top: 40px;">Admin Login</div>
+                <div class="form_details" style="margin-top: 28px;">Sign in</div>
+                <p class="login-role-hint">After login, the dashboard shows your account in a <strong>profile ring</strong>: gold border for <strong>Administrator</strong>, blue for <strong>Staff</strong>. Staff can register and manage donors, but <strong>only administrators can delete</strong> donor records or open User Management.</p>
 
                 <?php
                 if (isset($_SESSION['error'])) {
@@ -154,29 +176,40 @@ if (isset($_SESSION['user'])) {
 
                 <input name="username" class="input" type="text" placeholder="Username" required autocomplete="off">
                 <input name="password" class="input" type="password" placeholder="Password" required autocomplete="new-password">
-                <button id="loginBtn" class="btn" type="button">Login</button>
+                <button id="loginBtn" class="btn" type="submit">Login</button>
             </div>
         </form>
     </div>
 
     <script>
-    document.getElementById('loginBtn').addEventListener('click', function () {
-        Swal.fire({
-            title: 'Proceed to login?',
-            text: "Please confirm your login attempt.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#b00020',
-            cancelButtonColor: '#999',
-            confirmButtonText: 'Yes, login',
-            background: '#fff0f0',
-            color: '#b00020'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                document.getElementById('loginForm').submit();
+    (function () {
+        const form = document.getElementById('loginForm');
+        if (!form) return;
+
+        form.addEventListener('submit', function (e) {
+            // If SweetAlert2 didn't load (CDN blocked/offline), fall back to normal submit.
+            if (typeof Swal === 'undefined' || !Swal || typeof Swal.fire !== 'function') {
+                return;
             }
+
+            e.preventDefault();
+            Swal.fire({
+                title: 'Proceed to login?',
+                text: "Please confirm your login attempt.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#b00020',
+                cancelButtonColor: '#999',
+                confirmButtonText: 'Yes, login',
+                background: '#fff0f0',
+                color: '#b00020'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
         });
-    });
+    })();
     </script>
 </body>
 </html>
